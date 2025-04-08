@@ -1,54 +1,74 @@
-name: linter
+name: Linter
 
 on:
   push:
-    branches:
-      - develop
-      - main
+    branches: [ main, develop ]
   pull_request:
-    branches:
-      - develop
-      - main
-
-permissions:
-  contents: write
+    branches: [ main, develop ]
 
 jobs:
-  quality:
+  lint:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Setup PHP
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
-          extensions: mbstring, xml, dom, fileinfo, curl
+          extensions: mbstring, xml, dom, fileinfo, curl, tokenizer, bcmath
+          ini-values: memory_limit=-1
           coverage: none
 
+      # Setup Node.js
       - name: Setup Node
         uses: actions/setup-node@v3
         with:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install Dependencies
+      # Install PHP dependencies
+      - name: Install Composer dependencies
         run: |
-          php -d memory_limit=-1 /usr/bin/composer install --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
-          npm ci  # cleaner install than npm install
+          composer install --no-ansi --no-interaction --no-progress --prefer-dist
 
-      - name: Run Pint
-        run: vendor/bin/pint
+      # Install Node dependencies
+      - name: Install NPM dependencies
+        run: npm ci
 
-      - name: Format Frontend
-        run: npm run format
+      # PHP Linting
+      - name: Run PHP Syntax Check
+        run: find . -type f -name '*.php' -not -path './vendor/*' -exec php -l {} \;
 
-      - name: Lint Frontend
+      - name: Run Laravel Pint
+        run: ./vendor/bin/pint --test
+
+      # JavaScript/TypeScript Linting
+      - name: Run ESLint
         run: npm run lint
 
-      # Uncomment if you want auto-committing
-      # - name: Commit Changes
+      - name: Run TypeScript Check (if using TS)
+        if: contains(fromJson('package.json').devDependencies, 'typescript')
+        run: npm run type-check
+
+      # Vue.js Specific Linting
+      - name: Run Vue Template Linter
+        run: npm run lint:vue
+
+      # Formatting Checks
+      - name: Check PHP Code Style
+        run: ./vendor/bin/pint --dry-run
+
+      - name: Check JavaScript Formatting
+        run: npm run format:check
+
+      # Optional: Auto-fix and commit (uncomment if needed)
+      # - name: Fix and commit changes
+      #   if: always() && github.ref == 'refs/heads/main'
       #   uses: stefanzweifel/git-auto-commit-action@v5
       #   with:
-      #     commit_message: fix code style
-      #     commit_options: '--no-verify'
+      #     commit_message: 'style: auto-fix linting issues'
+      #     file_pattern: '*.php *.js *.vue *.ts'
