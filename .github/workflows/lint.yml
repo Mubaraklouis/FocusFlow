@@ -15,48 +15,47 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Setup PHP with stable version and required extensions
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'  # Using stable version instead of 8.4
+          php-version: '8.3'
           extensions: mbstring, xml, dom, fileinfo, curl, tokenizer, bcmath
           ini-values: memory_limit=-1
           coverage: none
 
-      # Setup Node.js with caching
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20'
           cache: 'npm'
 
-      # Improved dependency installation with error handling
       - name: Install Dependencies
         run: |
-          # Try composer install with verbose output
-          composer install --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist -v || \
-          { echo "::error::Composer install failed"; exit 1; }
+          # Install PHP dependencies
+          composer install --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist -v
           
-          # Clean npm install
+          # Generate lock file if missing (fallback)
+          if [ ! -f package-lock.json ]; then
+            echo "Generating package-lock.json..."
+            npm install --package-lock-only
+          fi
+          
+          # Install Node dependencies
           npm ci --no-audit
 
-      # PHP Quality Checks
       - name: Run Pint
         run: vendor/bin/pint --test
 
-      # Frontend Quality Checks
-      - name: Format Frontend
-        run: npm run format:check  # Changed to check only
+      - name: Check Frontend Formatting
+        run: npm run format:check
 
       - name: Lint Frontend
         run: npm run lint
 
-      # Only uncomment if you want automatic fixes committed
+      # Uncomment only if you want automatic fixes
       # - name: Commit Changes
       #   if: success()
       #   uses: stefanzweifel/git-auto-commit-action@v5
       #   with:
       #     commit_message: 'style: auto-fix linting issues'
       #     commit_options: '--no-verify'
-      #     file_pattern: '*.php *.js *.vue'
