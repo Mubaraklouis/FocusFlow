@@ -1,4 +1,4 @@
-name: Linter
+name: Code Quality Assurance
 
 on:
   push:
@@ -7,68 +7,74 @@ on:
     branches: [ main, develop ]
 
 jobs:
-  lint:
+  code-quality:
+    name: Lint and Static Analysis
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      # Setup PHP
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
           extensions: mbstring, xml, dom, fileinfo, curl, tokenizer, bcmath
-          ini-values: memory_limit=-1
+          ini-values: memory_limit=2G
           coverage: none
+          tools: composer:v2
 
-      # Setup Node.js
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20'
           cache: 'npm'
+          cache-dependency-path: package-lock.json
 
-      # Install PHP dependencies
-      - name: Install Composer dependencies
-        run: |
-          composer install --no-ansi --no-interaction --no-progress --prefer-dist
+      - name: Cache Composer Dependencies
+        uses: actions/cache@v3
+        with:
+          path: vendor
+          key: php-${{ hashFiles('composer.json') }}
+          restore-keys: php-
 
-      # Install Node dependencies
-      - name: Install NPM dependencies
-        run: npm ci
+      - name: Install PHP Dependencies
+        run: composer install --no-ansi --no-interaction --no-progress
 
-      # PHP Linting
-      - name: Run PHP Syntax Check
-        run: find . -type f -name '*.php' -not -path './vendor/*' -exec php -l {} \;
+      - name: Validate Composer
+        run: composer validate --strict
 
-      - name: Run Laravel Pint
-        run: ./vendor/bin/pint --test
+      - name: Cache Node Modules
+        uses: actions/cache@v3
+        with:
+          path: node_modules
+          key: node-${{ hashFiles('package-lock.json') }}
+          restore-keys: node-
 
-      # JavaScript/TypeScript Linting
-      - name: Run ESLint
-        run: npm run lint
+      - name: Install Node Dependencies
+        run: npm ci --prefer-offline --audit false
 
-      - name: Run TypeScript Check (if using TS)
+      - name: PHP Syntax Check
+        run: find . -type f -name '*.php' ! -path './vendor/*' -exec php -l {} \; || exit 1
+
+      - name: Laravel Pint Linting
+        run: ./vendor/bin/pint --test --verbose
+
+      - name: ESLint Analysis
+        run: npm run lint -- --max-warnings 0
+
+      - name: TypeScript Validation
         if: contains(fromJson('package.json').devDependencies, 'typescript')
-        run: npm run type-check
+        run: npm run type-check -- --strict
 
-      # Vue.js Specific Linting
-      - name: Run Vue Template Linter
-        run: npm run lint:vue
+      - name: Vue Template Validation
+        run: npm run lint:vue -- --no-fix
 
-      # Formatting Checks
-      - name: Check PHP Code Style
-        run: ./vendor/bin/pint --dry-run
-
-      - name: Check JavaScript Formatting
-        run: npm run format:check
-
-      # Optional: Auto-fix and commit (uncomment if needed)
-      # - name: Fix and commit changes
-      #   if: always() && github.ref == 'refs/heads/main'
-      #   uses: stefanzweifel/git-auto-commit-action@v5
-      #   with:
-      #     commit_message: 'style: auto-fix linting issues'
-      #     file_pattern: '*.php *.js *.vue *.ts'
+      - name: Security Audit
+        uses: ossf/scorecard-action@v2
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_results: true
