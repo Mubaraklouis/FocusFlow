@@ -65,7 +65,6 @@ jobs:
         run: npm run lint -- --max-warnings 0
 
       - name: TypeScript Validation
-        if: contains(fromJson('package.json').devDependencies, 'typescript')
         run: npm run type-check -- --strict
 
       - name: Vue Template Validation
@@ -74,7 +73,7 @@ jobs:
       - name: Security Audit
         uses: ossf/scorecard-action@v2
         with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
           results_file: results.sarif
           results_format: sarif
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
           publish_results: true
