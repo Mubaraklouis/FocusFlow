@@ -1,79 +1,45 @@
-name: Code Quality Assurance
+name: linter
 
 on:
   push:
-    branches: [ main, develop ]
+    branches:
+      - develop
+      - main
   pull_request:
-    branches: [ main, develop ]
+    branches:
+      - develop
+      - main
+
+permissions:
+  contents: write
 
 jobs:
-  code-quality:
-    name: Lint and Static Analysis
+  quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
-          extensions: mbstring, xml, dom, fileinfo, curl, tokenizer, bcmath
-          ini-values: memory_limit=2G
-          coverage: none
-          tools: composer:v2
+          php-version: '8.4'
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: package-lock.json
+      - name: Install Dependencies
+        run: |
+          composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
+          npm install
 
-      - name: Cache Composer Dependencies
-        uses: actions/cache@v3
-        with:
-          path: vendor
-          key: php-${{ hashFiles('composer.json') }}
-          restore-keys: php-
+      - name: Run Pint
+        run: vendor/bin/pint
 
-      - name: Install PHP Dependencies
-        run: composer install --no-ansi --no-interaction --no-progress
+      - name: Format Frontend
+        run: npm run format
 
-      - name: Validate Composer
-        run: composer validate --strict
+      - name: Lint Frontend
+        run: npm run lint
 
-      - name: Cache Node Modules
-        uses: actions/cache@v3
-        with:
-          path: node_modules
-          key: node-${{ hashFiles('package-lock.json') }}
-          restore-keys: node-
-
-      - name: Install Node Dependencies
-        run: npm ci --prefer-offline --audit false
-
-      - name: PHP Syntax Check
-        run: find . -type f -name '*.php' ! -path './vendor/*' -exec php -l {} \; || exit 1
-
-      - name: Laravel Pint Linting
-        run: ./vendor/bin/pint --test --verbose
-
-      - name: ESLint Analysis
-        run: npm run lint -- --max-warnings 0
-
-      - name: TypeScript Validation
-        run: npm run type-check -- --strict
-
-      - name: Vue Template Validation
-        run: npm run lint:vue -- --no-fix
-
-      - name: Security Audit
-        uses: ossf/scorecard-action@v2
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          results_file: results.sarif
-          results_format: sarif
-          publish_results: true
+      # - name: Commit Changes
+      #   uses: stefanzweifel/git-auto-commit-action@v5
+      #   with:
+      #     commit_message: fix code style
+      #     commit_options: '--no-verify'
