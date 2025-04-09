@@ -353,6 +353,12 @@ import { Head, Link } from '@inertiajs/vue3';
                                 stroke-linejoin="bevel"
                             />
                             <path
+                                d="M464.198 304.708L435.375 254.789L377.307 355.366L406.13 405.285L464.198 304.708Z"
+                                stroke="#1B1B18"
+                                stroke-width="1"
+                                stroke-linejoin="bevel"
+                            />
+                            <path
                                 d="M353.209 254.787C366.68 242.548 376.618 232.22 383.023 223.805L324.955 324.382C318.55 332.797 308.612 343.124 295.141 355.364L353.209 254.787Z"
                                 stroke="#1B1B18"
                                 stroke-width="1"
